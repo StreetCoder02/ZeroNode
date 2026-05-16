@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   let dot = 0, normA = 0, normB = 0;
@@ -17,6 +19,13 @@ export async function embedText(text: string): Promise<number[] | null> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ text }),
     });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      if (errData?.error?.includes("configured")) {
+        toast.error("Live AI features require API keys. See README to self-host, or contact the demo owner.", { duration: 6000 });
+        return null;
+      }
+    }
     const data = await res.json();
     return data.embedding ?? null;
   } catch {

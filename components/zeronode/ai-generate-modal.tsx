@@ -93,7 +93,7 @@ export default function AIGenerateModal({
   const [generatedNodes, setGeneratedNodes] = useState<GeneratedNode[]>([]);
   const [visibleNodes, setVisibleNodes] = useState<number>(0);
   const [hasGenerated, setHasGenerated] = useState(false);
-  const apiNodesRef = useRef<any[]>([]);
+  const apiNodesRef = useRef<Array<{title: string, description: string, nodeType: string, connections: string[]}>>([]);
 
   // Reset state when modal opens/closes and handle initial prompt
   useEffect(() => {
@@ -123,7 +123,17 @@ export default function AIGenerateModal({
         body: JSON.stringify({ prompt }),
       });
 
-      if (!res.ok || !res.body) throw new Error("Stream failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        if (errData?.error?.includes("configured")) {
+          toast.error("Live AI features require API keys. See README to self-host, or contact the demo owner.", { duration: 6000 });
+          setIsGenerating(false);
+          setHasGenerated(false);
+          return;
+        }
+        throw new Error("Stream failed");
+      }
+      if (!res.body) throw new Error("Stream failed");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

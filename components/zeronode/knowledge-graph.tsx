@@ -242,7 +242,7 @@ function KnowledgeGraphInner() {
       }
       
       const { findRelatedNodes } = await import("@/lib/embeddings");
-      const related = findRelatedNodes(embedding as number[], nodes as any, nodeId, 3);
+      const related = findRelatedNodes(embedding as number[], nodes as { id: string; data: { title: string; embedding?: number[] } }[], nodeId, 3);
       
       if (related.length === 0) {
         toast.info("No related nodes found yet. Add more nodes first.");

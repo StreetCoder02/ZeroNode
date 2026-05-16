@@ -65,6 +65,16 @@ export default function GraphChat({ nodes }: GraphChatProps) {
         }),
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        if (errData?.error?.includes("configured")) {
+          toast.error("Live AI features require API keys. See README to self-host, or contact the demo owner.", { duration: 6000 });
+          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+          setIsLoading(false);
+          return;
+        }
+        throw new Error("Chat failed");
+      }
       const data = await res.json();
       if (data.answer) {
         setMessages((prev) => [

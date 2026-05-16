@@ -219,6 +219,17 @@ export default function NodeEditorPanel({
                           content: content,
                         }),
                       });
+                      if (!res.ok) {
+                        const errData = await res.json().catch(() => null);
+                        if (errData?.error?.includes("configured")) {
+                          toast.error("Live AI features require API keys. See README to self-host, or contact the demo owner.", { duration: 6000 });
+                          setIsExpanding(false);
+                          return;
+                        }
+                        toast.error("Expansion failed");
+                        setIsExpanding(false);
+                        return;
+                      }
                       const data = await res.json();
                       if (data.text) {
                         setContent(data.text);

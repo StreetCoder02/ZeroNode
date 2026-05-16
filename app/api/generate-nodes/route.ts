@@ -2,6 +2,9 @@ import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.GROQ_API_KEY) {
+      return Response.json({ error: "GROQ_API_KEY is not configured." }, { status: 500 });
+    }
     const { prompt } = await req.json();
     if (!prompt) {
       return new Response(JSON.stringify({ error: "No prompt" }), {

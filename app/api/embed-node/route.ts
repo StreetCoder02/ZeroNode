@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: "GEMINI_API_KEY is not configured." }, { status: 500 });
+    }
     const { text } = await req.json();
     if (!text) return NextResponse.json({ error: "No text" }, { status: 400 });
 
