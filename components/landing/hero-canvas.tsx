@@ -66,41 +66,6 @@ const connections = [
 export default function HeroCanvas() {
   return (
     <div className="relative w-full h-[400px] lg:h-[500px]">
-      {/* SVG Connections - uses viewBox so coordinates are clean */}
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.5" />
-          </linearGradient>
-        </defs>
-        {connections.map((conn, i) => {
-          const from = heroNodes.find((n) => n.id === conn.from)!;
-          const to = heroNodes.find((n) => n.id === conn.to)!;
-          const x1 = from.x + 8;
-          const y1 = from.y + 5;
-          const x2 = to.x + 8;
-          const y2 = to.y + 5;
-          const mx = (x1 + x2) / 2;
-          const my = (y1 + y2) / 2 - 8;
-          return (
-            <path
-              key={i}
-              d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`}
-              fill="none"
-              stroke="url(#lineGradient)"
-              strokeWidth="0.8"
-              strokeDasharray="3 2"
-              className="animate-flow"
-              style={{ animationDelay: `${i * 0.3}s` }}
-            />
-          );
-        })}
-      </svg>
 
       {/* Nodes */}
       {heroNodes.map((node) => {
