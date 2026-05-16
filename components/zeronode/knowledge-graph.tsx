@@ -20,6 +20,7 @@ import {
   type Edge,
   BackgroundVariant,
 } from "@xyflow/react";
+import type { ReactFlowInstance } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toPng } from "html-to-image";
 
@@ -29,6 +30,7 @@ import CanvasToolbar from "./canvas-toolbar";
 import AIPanel from "./ai-panel";
 import NodeEditorPanel from "./node-editor-panel";
 import AIGenerateModal from "./ai-generate-modal";
+import SettingsModal from "./settings-modal";
 import EmptyState from "./empty-state";
 import CommandPalette from "./command-palette";
 import Navbar from "./navbar";
@@ -63,13 +65,22 @@ function KnowledgeGraphInner() {
   const [selectedNode, setSelectedNode] = useState<Node<KnowledgeNodeData> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [activeTool, setActiveTool] = useState<"select" | "pan" | "add" | "connect" | "delete">("select");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const handleToolChange = useCallback(
+    (tool: "select" | "pan" | "add" | "connect" | "delete") => {
+      setActiveTool(tool);
+    },
+    []
+  );
 
   useEffect(() => {
     const encoded = searchParams.get("graph");
     if (!encoded) return;
     const decoded = decodeGraph(encoded);
     if (decoded && decoded.nodes.length > 0) {
-      setNodes(decoded.nodes);
+      setNodes(decoded.nodes as Node<KnowledgeNodeData>[]);
       setEdges(decoded.edges);
       toast.success("Shared graph loaded");
       window.history.replaceState({}, "", "/app");
@@ -131,12 +142,25 @@ function KnowledgeGraphInner() {
     [setEdges]
   );
 
+  const handleDeleteNode = useCallback(
+    (id: string) => {
+      setNodes((nds) => nds.filter((node) => node.id !== id));
+      setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+    },
+    [setNodes, setEdges]
+  );
+
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      if (activeTool === "delete") {
+        handleDeleteNode(node.id);
+        toast.success("Node deleted");
+        return;
+      }
       setSelectedNode(node as Node<KnowledgeNodeData>);
-      setIsAIPanelOpen(false); // Close AI panel when opening node editor
+      setIsAIPanelOpen(false);
     },
-    []
+    [activeTool, handleDeleteNode]
   );
 
   const handleUpdateNode = useCallback(
@@ -156,14 +180,6 @@ function KnowledgeGraphInner() {
       );
     },
     [setNodes]
-  );
-
-  const handleDeleteNode = useCallback(
-    (id: string) => {
-      setNodes((nds) => nds.filter((node) => node.id !== id));
-      setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
-    },
-    [setNodes, setEdges]
   );
 
   const handleRemoveConnection = useCallback(
@@ -215,8 +231,64 @@ function KnowledgeGraphInner() {
           );
         }
       });
+
+      setTimeout(async () => {
+        const { findRelatedNodes } = await import("@/lib/embeddings");
+        
+        setNodes((currentNodes) => {
+          const addedIds = nodesToAdd.map((n) => n.id);
+          const addedNodes = currentNodes.filter((n) => 
+            addedIds.includes(n.id)
+          );
+          
+          const autoEdges: Edge[] = [];
+          const seenPairs = new Set<string>();
+          
+          for (const node of addedNodes) {
+            if (!node.data.embedding) continue;
+            
+            const related = findRelatedNodes(
+              node.data.embedding as number[],
+              addedNodes as { id: string; data: { title: string; embedding?: number[] } }[],
+              node.id,
+              2
+            );
+            
+            for (const r of related) {
+              if (r.score < 0.75) continue;
+              const pairKey = [node.id, r.id].sort().join("-");
+              if (seenPairs.has(pairKey)) continue;
+              seenPairs.add(pairKey);
+              
+              autoEdges.push({
+                id: `auto-${pairKey}`,
+                source: node.id,
+                target: r.id,
+                type: "animated",
+                style: {
+                  stroke: "rgba(59, 130, 246, 0.35)",
+                  strokeWidth: 1,
+                },
+              });
+            }
+          }
+          
+          if (autoEdges.length > 0) {
+            setEdges((eds) => {
+              const existingIds = new Set(eds.map((e) => e.id));
+              const newEdges = autoEdges.filter((e) => !existingIds.has(e.id));
+              return [...eds, ...newEdges];
+            });
+            toast.success(
+              `Auto-linked ${autoEdges.length} related node${autoEdges.length > 1 ? "s" : ""} by meaning`
+            );
+          }
+          
+          return currentNodes;
+        });
+      }, 3000);
     },
-    [setNodes]
+    [setNodes, setEdges]
   );
 
   const handleFindRelated = useCallback(
@@ -384,6 +456,7 @@ function KnowledgeGraphInner() {
         onClearGraph={handleClearGraph}
         onExport={handleExport}
         onShare={handleShare}
+        onSettingsClick={() => setIsSettingsOpen(true)}
       />
 
       <div ref={containerRef} className="flex-1 relative">
@@ -412,6 +485,36 @@ function KnowledgeGraphInner() {
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
           className="!bg-transparent"
+          panOnDrag={activeTool === "pan" || activeTool === "select"}
+          selectionOnDrag={activeTool === "select"}
+          connectOnClick={activeTool === "connect"}
+          onPaneClick={(event) => {
+            if (activeTool === "add") {
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const position = {
+                x: event.clientX - bounds.left,
+                y: event.clientY - bounds.top,
+              };
+              const newNode: Node<KnowledgeNodeData> = {
+                id: `node-${Date.now()}`,
+                type: "knowledge",
+                position,
+                data: {
+                  title: "New Node",
+                  preview: "Click to edit...",
+                  nodeType: "note",
+                },
+              };
+              setNodes((nds) => [...nds, newNode]);
+            }
+          }}
+          style={{
+            cursor: activeTool === "pan" ? "grab"
+              : activeTool === "add" ? "crosshair"
+              : activeTool === "delete" ? "not-allowed"
+              : activeTool === "connect" ? "crosshair"
+              : "default"
+          }}
         >
           <Background
             variant={BackgroundVariant.Dots}
@@ -442,7 +545,10 @@ function KnowledgeGraphInner() {
           />
         )}
 
-        <CanvasToolbar />
+        <CanvasToolbar 
+          activeTool={activeTool}
+          onToolChange={handleToolChange}
+        />
         <AIPanel isOpen={isAIPanelOpen} onClose={() => setIsAIPanelOpen(false)} />
         <NodeEditorPanel
           isOpen={selectedNode !== null}
@@ -478,6 +584,10 @@ function KnowledgeGraphInner() {
           nodeCounts={nodeCounts}
         />
         <GraphChat nodes={nodes as Node<KnowledgeNodeData>[]} />
+        <SettingsModal 
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+        />
       </div>
     </div>
   );

@@ -8,9 +8,10 @@ interface NavbarProps {
   onExport: () => void;
   onShare: () => void;
   onClearGraph?: () => void;
+  onSettingsClick: () => void;
 }
 
-export default function Navbar({ onAIClick, onAIGenerateClick, onExport, onShare, onClearGraph }: NavbarProps) {
+export default function Navbar({ onAIClick, onAIGenerateClick, onExport, onShare, onClearGraph, onSettingsClick }: NavbarProps) {
   return (
     <nav className="h-12 flex items-center justify-between px-4 border-b border-white/10 bg-black/50 backdrop-blur-xl relative z-50">
       {/* Logo */}
@@ -101,6 +102,7 @@ export default function Navbar({ onAIClick, onAIGenerateClick, onExport, onShare
           </button>
         )}
         <button
+          onClick={onSettingsClick}
           className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-primary/20 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all duration-300"
           title="Settings"
         >

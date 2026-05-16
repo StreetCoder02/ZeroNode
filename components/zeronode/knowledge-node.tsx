@@ -21,7 +21,8 @@ export type NodeType =
   | "roadmap"
   | "research";
 
-export interface KnowledgeNodeData extends Record<string, unknown> {
+export interface KnowledgeNodeData {
+  [key: string]: unknown;
   title: string;
   preview: string;
   nodeType: NodeType;

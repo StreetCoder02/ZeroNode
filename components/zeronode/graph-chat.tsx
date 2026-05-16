@@ -97,7 +97,7 @@ export default function GraphChat({ nodes }: GraphChatProps) {
       {/* Toggle button - bottom left of canvas */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className="absolute bottom-6 left-6 z-20 flex items-center gap-2 
+        className="absolute bottom-24 left-6 z-20 flex items-center gap-2 
           px-4 py-2.5 rounded-xl text-sm font-medium text-white
           bg-violet-600/80 hover:bg-violet-600 backdrop-blur-sm
           border border-violet-500/30 shadow-lg shadow-violet-500/20
@@ -109,7 +109,7 @@ export default function GraphChat({ nodes }: GraphChatProps) {
 
       {/* Chat panel */}
       {isOpen && (
-        <div className="absolute bottom-20 left-6 z-30 w-[340px] 
+        <div className="absolute bottom-40 left-6 z-30 w-[340px] 
           flex flex-col rounded-2xl overflow-hidden
           bg-[#0a0a0a] border border-white/10 
           shadow-2xl shadow-violet-500/10
