@@ -4,25 +4,31 @@ export async function POST(req: NextRequest) {
   try {
     const { prompt } = await req.json();
     if (!prompt) {
-      return new Response(JSON.stringify({ error: "No prompt" }), { 
-        status: 400 
+      return new Response(JSON.stringify({ error: "No prompt" }), {
+        status: 400,
       });
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        stream: true,
-        system: `You are a knowledge graph AI. Given a topic or learning goal,
-generate exactly 7 knowledge nodes that form a connected learning structure.
-Respond ONLY with a valid JSON array. No markdown, no backticks, no explanation.
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          max_tokens: 1024,
+          stream: true,
+          messages: [
+            {
+              role: "system",
+              content: `You are a knowledge graph AI. Given a topic or 
+learning goal, generate exactly 7 knowledge nodes that form a connected 
+learning structure.
+Respond ONLY with a valid JSON array. No markdown, no backticks, 
+no explanation, no text before or after the array.
 Each object must have these exact fields:
 - title: string (max 4 words)
 - description: string (max 12 words)
@@ -31,13 +37,21 @@ Each object must have these exact fields:
 
 Example format:
 [{"title":"Load Balancing","description":"Distribute traffic across servers for reliability","nodeType":"concept","connections":["API Gateway"]}]`,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        }),
+      }
+    );
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: "Claude API error" }), { 
-        status: 500 
+      const err = await response.text();
+      console.error("Groq error:", err);
+      return new Response(JSON.stringify({ error: "Groq API error" }), {
+        status: 500,
       });
     }
 
@@ -52,33 +66,34 @@ Example format:
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n").filter((l) => l.trim());
+          const lines = chunk
+            .split("\n")
+            .filter((l) => l.trim().startsWith("data: "));
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === "content_block_delta") {
-                  const delta = parsed.delta?.text || "";
-                  fullText += delta;
-                  controller.enqueue(
-                    new TextEncoder().encode(
-                      `data: ${JSON.stringify({ delta, fullText })}\n\n`
-                    )
-                  );
-                }
-                if (parsed.type === "message_stop") {
-                  controller.enqueue(
-                    new TextEncoder().encode(
-                      `data: ${JSON.stringify({ done: true, fullText })}\n\n`
-                    )
-                  );
-                }
-              } catch {
-                // skip malformed chunks
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ done: true, fullText })}\n\n`
+                )
+              );
+              continue;
+            }
+            try {
+              const parsed = JSON.parse(data);
+              const delta =
+                parsed.choices?.[0]?.delta?.content || "";
+              if (delta) {
+                fullText += delta;
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    `data: ${JSON.stringify({ delta, fullText })}\n\n`
+                  )
+                );
               }
+            } catch {
+              // skip malformed chunks
             }
           }
         }
@@ -95,8 +110,8 @@ Example format:
     });
   } catch (err) {
     console.error("Stream error:", err);
-    return new Response(JSON.stringify({ error: "Stream failed" }), { 
-      status: 500 
+    return new Response(JSON.stringify({ error: "Stream failed" }), {
+      status: 500,
     });
   }
 }

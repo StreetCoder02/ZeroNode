@@ -8,24 +8,36 @@ export async function POST(req: NextRequest) {
     }
 
     const knowledgeContext = nodes
-      .map((n: { title: string; content?: string; preview?: string; nodeType: string }) => 
-        `- [${n.nodeType.toUpperCase()}] ${n.title}: ${n.content || n.preview || "no content"}`
+      .map(
+        (n: {
+          title: string;
+          content?: string;
+          preview?: string;
+          nodeType: string;
+        }) =>
+          `- [${n.nodeType.toUpperCase()}] ${n.title}: ${
+            n.content || n.preview || "no content"
+          }`
       )
       .join("\n");
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 512,
-        system: `You are a knowledge assistant. You ONLY answer based on 
-the user's knowledge graph nodes provided below. 
-If the answer isn't in their nodes, say: 
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          max_tokens: 512,
+          messages: [
+            {
+              role: "system",
+              content: `You are a knowledge assistant. You ONLY answer 
+based on the user's knowledge graph nodes provided below.
+If the answer is not in their nodes, say exactly:
 "I don't see anything about that in your graph yet. 
 Try generating some nodes on this topic first."
 Be conversational, concise, max 4 sentences.
@@ -33,14 +45,23 @@ Never make up information not present in the nodes.
 
 USER'S KNOWLEDGE GRAPH:
 ${knowledgeContext}`,
-        messages: [{ role: "user", content: question }],
-      }),
-    });
+            },
+            {
+              role: "user",
+              content: question,
+            },
+          ],
+        }),
+      }
+    );
 
     const data = await response.json();
-    const text = data.content?.[0]?.text;
+    const text = data.choices?.[0]?.message?.content;
     if (!text) {
-      return NextResponse.json({ error: "No response" }, { status: 500 });
+      return NextResponse.json(
+        { error: "No response from Groq" },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ answer: text });
