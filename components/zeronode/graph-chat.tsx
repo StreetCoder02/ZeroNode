@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Node } from "@xyflow/react";
 import type { KnowledgeNodeData } from "./knowledge-node";
 import { toast } from "sonner";
@@ -108,14 +109,19 @@ export default function GraphChat({ nodes }: GraphChatProps) {
       </button>
 
       {/* Chat panel */}
-      {isOpen && (
-        <div className="absolute bottom-52 left-6 z-30 w-[340px] 
-          flex flex-col rounded-2xl overflow-hidden
-          bg-[#0a0a0a] border border-white/10 
-          shadow-2xl shadow-violet-500/10
-          animate-in fade-in slide-in-from-bottom-4 duration-200"
-          style={{ maxHeight: "420px" }}
-        >
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", bounce: 0.3 }}
+            className="absolute bottom-52 left-6 z-30 w-[340px] 
+              flex flex-col rounded-2xl overflow-hidden
+              bg-[#0a0a0a] border border-white/10 
+              shadow-2xl shadow-violet-500/10"
+            style={{ maxHeight: "420px" }}
+          >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 
             border-b border-white/10 shrink-0">
@@ -233,8 +239,9 @@ export default function GraphChat({ nodes }: GraphChatProps) {
               </button>
             </div>
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

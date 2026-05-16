@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { X, Sparkles, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { type KnowledgeNodeData } from "./knowledge-node";
 
@@ -202,18 +203,27 @@ export default function AIGenerateModal({
 
   const selectedCount = generatedNodes.filter((n) => n.selected).length;
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-[560px] max-h-[85vh] mx-4 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl shadow-blue-500/10 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", bounce: 0.3 }}
+            className="relative w-full max-w-[560px] max-h-[85vh] mx-4 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl shadow-blue-500/10 overflow-hidden flex flex-col"
+          >
         {/* Header */}
         <div className="flex items-center justify-between p-6 pb-4">
           <div className="flex items-center gap-3">
@@ -352,7 +362,9 @@ export default function AIGenerateModal({
             </>
           )}
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

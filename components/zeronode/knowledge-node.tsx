@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { motion } from "framer-motion";
 import {
   Code,
   Lightbulb,
@@ -53,9 +54,16 @@ function KnowledgeNode({ data }: NodeProps) {
   const Icon = config.icon;
 
   return (
-    <div
-      className="group relative animate-fade-scale-in"
-      style={{ animationDelay: `${Math.random() * 0.3}s` }}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8, y: 15 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ 
+        type: "spring",
+        stiffness: 400,
+        damping: 25,
+        delay: Math.random() * 0.15 
+      }}
+      className="group relative"
     >
       <Handle
         type="target"
@@ -114,7 +122,7 @@ function KnowledgeNode({ data }: NodeProps) {
         position={Position.Bottom}
         className="!w-2 !h-2 !bg-white/20 !border-none hover:!bg-primary transition-colors"
       />
-    </div>
+    </motion.div>
   );
 }
 
