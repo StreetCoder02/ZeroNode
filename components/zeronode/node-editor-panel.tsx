@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   X,
   Brain,
@@ -56,6 +57,7 @@ export default function NodeEditorPanel({
   const [tagInput, setTagInput] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isFindingRelated, setIsFindingRelated] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Get connected nodes
@@ -70,8 +72,8 @@ export default function NodeEditorPanel({
   useEffect(() => {
     if (node) {
       setTitle(node.data.title);
-      setContent(node.data.preview || "");
-      setTags([]); // Would come from node data in real app
+      setContent((node.data.content as string) || node.data.preview || "");
+      setTags((node.data.tags as string[]) || []);
     }
   }, [node]);
 
@@ -182,10 +184,14 @@ export default function NodeEditorPanel({
             <div className="flex flex-col gap-2">
               <textarea
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setContent(value);
+                  onUpdateNode(node.id, { content: value, preview: value.slice(0, 60) });
+                }}
                 onBlur={() => {
-                  if (content !== node.data.preview) {
-                    onUpdateNode(node.id, { preview: content });
+                  if (content !== node.data.preview && content !== node.data.content) {
+                    onUpdateNode(node.id, { content, preview: content.slice(0, 60) });
                   }
                 }}
                 placeholder="Write your thoughts, links, code..."
@@ -200,9 +206,41 @@ export default function NodeEditorPanel({
                 AI Actions
               </h3>
               <div className="flex flex-col gap-1.5">
-                <button className="flex items-center gap-2 px-3 py-2 text-sm text-white/70 bg-transparent border border-white/10 rounded-lg hover:bg-white/5 hover:text-white hover:border-white/20 transition-all">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  Summarize with AI
+                <button
+                  onClick={async () => {
+                    if (!node || isExpanding) return;
+                    setIsExpanding(true);
+                    try {
+                      const res = await fetch("/api/expand-node", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({
+                          title: node.data.title,
+                          content: content,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (data.text) {
+                        setContent(data.text);
+                        onUpdateNode(node.id, { 
+                          content: data.text,
+                          preview: data.text.slice(0, 60) + "..."
+                        });
+                        toast.success("Node expanded");
+                      } else {
+                        toast.error("Expansion failed");
+                      }
+                    } catch {
+                      toast.error("Expansion failed");
+                    } finally {
+                      setIsExpanding(false);
+                    }
+                  }}
+                  disabled={isExpanding}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/60 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+                  {isExpanding ? "Expanding..." : "Expand with AI"}
                 </button>
                 <button
                   onClick={async () => {

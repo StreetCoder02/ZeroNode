@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Sparkles, Check } from "lucide-react";
+import { toast } from "sonner";
 import { type KnowledgeNodeData } from "./knowledge-node";
 
 interface GeneratedNode {
@@ -92,6 +93,7 @@ export default function AIGenerateModal({
   const [generatedNodes, setGeneratedNodes] = useState<GeneratedNode[]>([]);
   const [visibleNodes, setVisibleNodes] = useState<number>(0);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const apiNodesRef = useRef<any[]>([]);
 
   // Reset state when modal opens/closes and handle initial prompt
   useEffect(() => {
@@ -106,28 +108,70 @@ export default function AIGenerateModal({
     }
   }, [isOpen, initialPrompt]);
 
-  // Staggered animation for nodes appearing
-  useEffect(() => {
-    if (isGenerating && visibleNodes < sampleGeneratedNodes.length) {
-      const timer = setTimeout(() => {
-        setGeneratedNodes((prev) => [
-          ...prev,
-          { ...sampleGeneratedNodes[visibleNodes], selected: true },
-        ]);
-        setVisibleNodes((prev) => prev + 1);
-      }, 200);
-      return () => clearTimeout(timer);
-    } else if (visibleNodes === sampleGeneratedNodes.length && isGenerating) {
-      setIsGenerating(false);
-    }
-  }, [isGenerating, visibleNodes]);
-
-  const handleGenerate = () => {
-    if (!prompt.trim()) return;
+  const handleGenerate = async () => {
+    if (!prompt.trim() || isGenerating) return;
     setIsGenerating(true);
     setGeneratedNodes([]);
     setVisibleNodes(0);
     setHasGenerated(true);
+    apiNodesRef.current = [];
+
+    try {
+      const res = await fetch("/api/generate-nodes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!res.ok || !res.body) throw new Error("Stream failed");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.done && data.fullText) {
+              const cleaned = data.fullText
+                .replace(/```json/g, "")
+                .replace(/```/g, "")
+                .trim();
+              const nodes = JSON.parse(cleaned);
+              apiNodesRef.current = nodes;
+              
+              let i = 0;
+              const stagger = setInterval(() => {
+                if (i >= nodes.length) {
+                  clearInterval(stagger);
+                  setIsGenerating(false);
+                  return;
+                }
+                setGeneratedNodes((prev) => [
+                  ...prev,
+                  { ...nodes[i], id: `gen-${Date.now()}-${i}`, selected: true },
+                ]);
+                i++;
+              }, 150);
+            }
+          } catch {
+            // skip malformed
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Generation error:", err);
+      toast.error("Generation failed. Check your API key and try again.");
+      setIsGenerating(false);
+      setHasGenerated(false);
+    }
   };
 
   const toggleNodeSelection = (id: string) => {

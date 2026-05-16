@@ -1,13 +1,16 @@
 "use client";
 
-import { Search, Sparkles, Plus, Settings } from "lucide-react";
+import { Search, Sparkles, Plus, Settings, Download, Share2 } from "lucide-react";
 
 interface NavbarProps {
   onAIClick: () => void;
   onAIGenerateClick: () => void;
+  onExport: () => void;
+  onShare: () => void;
+  onClearGraph?: () => void;
 }
 
-export default function Navbar({ onAIClick, onAIGenerateClick }: NavbarProps) {
+export default function Navbar({ onAIClick, onAIGenerateClick, onExport, onShare, onClearGraph }: NavbarProps) {
   return (
     <nav className="h-12 flex items-center justify-between px-4 border-b border-white/10 bg-black/50 backdrop-blur-xl relative z-50">
       {/* Logo */}
@@ -74,6 +77,29 @@ export default function Navbar({ onAIClick, onAIGenerateClick }: NavbarProps) {
         >
           <Plus className="w-4.5 h-4.5" />
         </button>
+        <button
+          onClick={onExport}
+          title="Export as PNG"
+          className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onShare}
+          title="Share graph"
+          className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all"
+        >
+          <Share2 className="w-4 h-4" />
+        </button>
+        {onClearGraph && (
+          <button
+            onClick={onClearGraph}
+            title="Clear Graph"
+            className="p-2 rounded-lg text-red-500/50 hover:text-red-500 hover:bg-red-500/10 transition-all"
+          >
+            Clear
+          </button>
+        )}
         <button
           className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-primary/20 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all duration-300"
           title="Settings"

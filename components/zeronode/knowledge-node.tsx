@@ -26,6 +26,7 @@ export interface KnowledgeNodeData extends Record<string, unknown> {
   preview: string;
   nodeType: NodeType;
   embedding?: number[];
+  content?: string;
 }
 
 const nodeTypeConfig: Record<

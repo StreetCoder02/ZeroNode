@@ -11,12 +11,17 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
+  ReactFlowProvider,
   type Connection,
   type Node,
   type Edge,
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { toPng } from "html-to-image";
 
 import KnowledgeNode, { type KnowledgeNodeData } from "./knowledge-node";
 import AnimatedEdge from "./animated-edge";
@@ -27,6 +32,11 @@ import AIGenerateModal from "./ai-generate-modal";
 import EmptyState from "./empty-state";
 import CommandPalette from "./command-palette";
 import Navbar from "./navbar";
+import GraphChat from "./graph-chat";
+import NodeFilterBar from "./node-filter-bar";
+import type { NodeType } from "./knowledge-node";
+import { buildShareUrl, decodeGraph } from "@/lib/share";
+import { useSearchParams } from "next/navigation";
 
 const nodeTypes = {
   knowledge: KnowledgeNode,
@@ -40,9 +50,12 @@ const initialNodes: Node<KnowledgeNodeData>[] = [];
 
 const initialEdges: Edge[] = [];
 
-export default function KnowledgeGraph() {
+function KnowledgeGraphInner() {
+  const searchParams = useSearchParams();
+  const { getNodes, fitView } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [activeFilter, setActiveFilter] = useState<NodeType | "all">("all");
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [isAIGenerateModalOpen, setIsAIGenerateModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -50,6 +63,68 @@ export default function KnowledgeGraph() {
   const [selectedNode, setSelectedNode] = useState<Node<KnowledgeNodeData> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const encoded = searchParams.get("graph");
+    if (!encoded) return;
+    const decoded = decodeGraph(encoded);
+    if (decoded && decoded.nodes.length > 0) {
+      setNodes(decoded.nodes);
+      setEdges(decoded.edges);
+      toast.success("Shared graph loaded");
+      window.history.replaceState({}, "", "/app");
+    }
+  }, [searchParams, setNodes, setEdges]);
+
+  const handleShare = useCallback(() => {
+    if (nodes.length === 0) {
+      toast.info("Add some nodes before sharing.");
+      return;
+    }
+    const url = buildShareUrl(nodes, edges);
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success("Share link copied to clipboard");
+    }).catch(() => {
+      toast.error("Could not copy to clipboard");
+    });
+  }, [nodes, edges]);
+
+  const handleClearGraph = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+  }, [setNodes, setEdges]);
+
+  const nodeCounts = nodes.reduce((acc, node) => {
+    const type = node.data.nodeType as string;
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const filteredNodes = activeFilter === "all"
+    ? nodes
+    : nodes.map((n) => ({
+        ...n,
+        style: {
+          ...n.style,
+          opacity: n.data.nodeType === activeFilter ? 1 : 0.15,
+          transition: "opacity 0.3s ease",
+        },
+      }));
+
+  const onNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const connectedIds = edges
+        .filter((e) => e.source === node.id || e.target === node.id)
+        .flatMap((e) => [e.source, e.target]);
+      const relatedIds = [...new Set([node.id, ...connectedIds])];
+      fitView({
+        nodes: relatedIds.map((id) => ({ id })),
+        duration: 600,
+        padding: 0.3,
+      });
+    },
+    [edges, fitView]
+  );
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -224,6 +299,45 @@ export default function KnowledgeGraph() {
     setNodes((nds) => [...nds, newNode]);
   }, [setNodes]);
 
+  const handleExport = useCallback(() => {
+    const nodesBounds = getNodesBounds(getNodes());
+    const imageWidth = 1920;
+    const imageHeight = 1080;
+    const viewport = getViewportForBounds(
+      nodesBounds,
+      imageWidth,
+      imageHeight,
+      0.5,
+      2,
+      0.1
+    );
+
+    const viewportEl = document.querySelector(
+      ".react-flow__viewport"
+    ) as HTMLElement;
+    
+    if (!viewportEl) return;
+
+    toPng(viewportEl, {
+      backgroundColor: "#000000",
+      width: imageWidth,
+      height: imageHeight,
+      style: {
+        width: `${imageWidth}px`,
+        height: `${imageHeight}px`,
+        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+      },
+    }).then((dataUrl) => {
+      const a = document.createElement("a");
+      a.setAttribute("download", "zeronode-graph.png");
+      a.setAttribute("href", dataUrl);
+      a.click();
+      toast.success("Graph exported as PNG");
+    }).catch(() => {
+      toast.error("Export failed");
+    });
+  }, [getNodes]);
+
   const handleQuickGenerate = useCallback((prompt: string) => {
     setAiGenerateInitialPrompt(prompt);
     setIsAIGenerateModalOpen(true);
@@ -264,7 +378,13 @@ export default function KnowledgeGraph() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-black overflow-hidden">
-      <Navbar onAIClick={handleOpenAIPanel} onAIGenerateClick={handleOpenAIGenerateModal} />
+      <Navbar 
+        onAIClick={handleOpenAIPanel} 
+        onAIGenerateClick={handleOpenAIGenerateModal} 
+        onClearGraph={handleClearGraph}
+        onExport={handleExport}
+        onShare={handleShare}
+      />
 
       <div ref={containerRef} className="flex-1 relative">
         {/* Parallax dot grid */}
@@ -279,12 +399,13 @@ export default function KnowledgeGraph() {
         />
 
         <ReactFlow
-          nodes={nodes}
+          nodes={filteredNodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -351,7 +472,21 @@ export default function KnowledgeGraph() {
           onOpenAIGenerate={handleOpenAIGenerateModal}
           onCreateNode={handleCreateBlankNode}
         />
+        <NodeFilterBar
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          nodeCounts={nodeCounts}
+        />
+        <GraphChat nodes={nodes as Node<KnowledgeNodeData>[]} />
       </div>
     </div>
+  );
+}
+
+export default function KnowledgeGraph() {
+  return (
+    <ReactFlowProvider>
+      <KnowledgeGraphInner />
+    </ReactFlowProvider>
   );
 }
