@@ -6,9 +6,29 @@ import './globals.css'
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: 'ZeroNode - Knowledge Graph',
-  description: 'A futuristic knowledge graph application',
-  generator: 'v0.app',
+  title: 'ZeroNode – AI Knowledge Graph',
+  description: 'Turn scattered notes into a living knowledge graph. AI connects your ideas, finds gaps, and helps you think deeper.',
+  openGraph: {
+    title: 'ZeroNode – AI Knowledge Graph',
+    description: 'Turn scattered notes into a living knowledge graph. AI connects your ideas, finds gaps, and helps you think deeper.',
+    url: 'https://zero-node-jade.vercel.app',
+    siteName: 'ZeroNode',
+    images: [
+      {
+        url: 'https://zero-node-jade.vercel.app/og-image.png',
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ZeroNode – AI Knowledge Graph',
+    description: 'Turn scattered notes into a living knowledge graph. AI connects your ideas, finds gaps, and helps you think deeper.',
+    images: ['https://zero-node-jade.vercel.app/og-image.png'],
+  },
   icons: {
     icon: [
       {
