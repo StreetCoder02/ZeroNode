@@ -58,6 +58,7 @@ export default function NodeEditorPanel({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isFindingRelated, setIsFindingRelated] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
+  const [lastEdited, setLastEdited] = useState<Date | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Get connected nodes
@@ -74,6 +75,7 @@ export default function NodeEditorPanel({
       setTitle(node.data.title);
       setContent((node.data.content as string) || node.data.preview || "");
       setTags((node.data.tags as string[]) || []);
+      setLastEdited(new Date());
     }
   }, [node]);
 
@@ -88,10 +90,23 @@ export default function NodeEditorPanel({
 
   const currentTypeConfig = nodeTypes.find((t) => t.type === node.data.nodeType);
 
+  const updateNode = (data: Partial<KnowledgeNodeData>) => {
+    onUpdateNode(node.id, data);
+    setLastEdited(new Date());
+  };
+
+  const formatLastEdited = (date: Date | null) => {
+    if (!date) return "Not edited yet";
+    const diff = Date.now() - date.getTime();
+    if (diff < 60000) return "Just now";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    return `${Math.floor(diff / 3600000)}h ago`;
+  };
+
   const handleTitleBlur = () => {
     setIsEditingTitle(false);
     if (title.trim() && title !== node.data.title) {
-      onUpdateNode(node.id, { title: title.trim() });
+      updateNode({ title: title.trim() });
     }
   };
 
@@ -162,7 +177,7 @@ export default function NodeEditorPanel({
                 return (
                   <button
                     key={typeOption.type}
-                    onClick={() => onUpdateNode(node.id, { nodeType: typeOption.type })}
+                    onClick={() => updateNode({ nodeType: typeOption.type })}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
                     style={{
                       backgroundColor: isSelected ? typeOption.color : "rgba(255, 255, 255, 0.05)",
@@ -187,11 +202,11 @@ export default function NodeEditorPanel({
                 onChange={(e) => {
                   const value = e.target.value;
                   setContent(value);
-                  onUpdateNode(node.id, { content: value, preview: value.slice(0, 60) });
+                  updateNode({ content: value, preview: value.slice(0, 60) });
                 }}
                 onBlur={() => {
                   if (content !== node.data.preview && content !== node.data.content) {
-                    onUpdateNode(node.id, { content, preview: content.slice(0, 60) });
+                    updateNode({ content, preview: content.slice(0, 60) });
                   }
                 }}
                 placeholder="Write your thoughts, links, code..."
@@ -233,7 +248,7 @@ export default function NodeEditorPanel({
                       const data = await res.json();
                       if (data.text) {
                         setContent(data.text);
-                        onUpdateNode(node.id, { 
+                        updateNode({ 
                           content: data.text,
                           preview: data.text.slice(0, 60) + "..."
                         });
@@ -345,7 +360,7 @@ export default function NodeEditorPanel({
 
         {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-white/10">
-          <span className="text-xs text-white/30">Last edited just now</span>
+          <span className="text-xs text-white/30">Last edited {formatLastEdited(lastEdited)}</span>
           <button
             onClick={() => {
               onDeleteNode(node.id);

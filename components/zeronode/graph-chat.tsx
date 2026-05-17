@@ -15,10 +15,17 @@ interface Message {
 
 interface GraphChatProps {
   nodes: Node<KnowledgeNodeData>[];
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export default function GraphChat({ nodes }: GraphChatProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function GraphChat({ nodes, isOpen, onOpenChange }: GraphChatProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isOpen !== undefined ? isOpen : internalOpen;
+  const setOpen = (val: boolean) => {
+    setInternalOpen(val);
+    onOpenChange?.(val);
+  };
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -30,8 +37,8 @@ export default function GraphChat({ nodes }: GraphChatProps) {
   }, [messages]);
 
   useEffect(() => {
-    if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
-  }, [isOpen]);
+    if (open) setTimeout(() => inputRef.current?.focus(), 100);
+  }, [open]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -97,7 +104,7 @@ export default function GraphChat({ nodes }: GraphChatProps) {
     <>
       {/* Toggle button - bottom left of canvas */}
       <button
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => setOpen(!open)}
         className="absolute bottom-36 left-6 z-20 flex items-center gap-2 
           px-4 py-2.5 rounded-xl text-sm font-medium text-white
           bg-violet-600/80 hover:bg-violet-600 backdrop-blur-sm
@@ -110,7 +117,7 @@ export default function GraphChat({ nodes }: GraphChatProps) {
 
       {/* Chat panel */}
       <AnimatePresence>
-        {isOpen && (
+        {open && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -135,7 +142,7 @@ export default function GraphChat({ nodes }: GraphChatProps) {
               </span>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => setOpen(false)}
               className="p-1 rounded-md text-white/40 hover:text-white 
                 hover:bg-white/10 transition-colors"
             >

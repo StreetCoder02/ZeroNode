@@ -32,10 +32,12 @@ export default function NodeFilterBar({
   nodeCounts,
 }: NodeFilterBarProps) {
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 
+      z-20 max-w-[calc(100%-200px)]">
       <div className="flex items-center gap-1.5 px-3 py-2 rounded-2xl
         bg-black/80 backdrop-blur-xl border border-white/10
-        shadow-xl shadow-black/50">
+        shadow-xl shadow-black/50 overflow-x-auto 
+        scrollbar-none max-w-full">
         {filters.map(({ type, label, icon: Icon, color }) => {
           const count = type === "all"
             ? Object.values(nodeCounts).reduce((a, b) => a + b, 0)

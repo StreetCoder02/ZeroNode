@@ -20,6 +20,8 @@ interface CommandPaletteProps {
   onSelectNode: (node: Node<KnowledgeNodeData>) => void;
   onOpenAIGenerate: () => void;
   onCreateNode: () => void;
+  onExport: () => void;
+  onOpenGraphChat: () => void;
 }
 
 type ResultType = "node" | "action" | "ai";
@@ -51,6 +53,8 @@ export default function CommandPalette({
   onSelectNode,
   onOpenAIGenerate,
   onCreateNode,
+  onExport,
+  onOpenGraphChat,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -75,10 +79,7 @@ export default function CommandPalette({
         title: `Ask AI: "${query}"`,
         subtitle: "Search your knowledge base",
         icon: <MessageCircle className="w-4 h-4" />,
-        action: () => {
-          onClose();
-          // Would trigger AI search
-        },
+        action: () => { onOpenGraphChat(); onClose(); },
       });
     }
 
@@ -135,12 +136,25 @@ export default function CommandPalette({
       {
         id: "action-search",
         type: "action",
-        title: "Semantic search...",
+        title: "Search nodes by title or type",
         subtitle: "Action",
         icon: <Search className="w-4 h-4" />,
         action: () => {
           onClose();
+          setTimeout(() => {
+            const input = document.querySelector(
+              "input[placeholder='Search nodes, actions, or ask AI...']"
+            ) as HTMLInputElement;
+          }, 100);
         },
+      },
+      {
+        id: "action-chat",
+        type: "action",
+        title: "Ask your graph",
+        subtitle: "Action",
+        icon: <MessageCircle className="w-4 h-4 text-violet-400" />,
+        action: () => { onOpenGraphChat(); onClose(); },
       },
       {
         id: "action-export",
@@ -148,14 +162,12 @@ export default function CommandPalette({
         title: "Export graph as PNG",
         subtitle: "Action",
         icon: <Download className="w-4 h-4" />,
-        action: () => {
-          onClose();
-        },
+        action: () => { onExport(); onClose(); },
       }
     );
 
     return results;
-  }, [query, isQuestion, nodes, onSelectNode, onOpenAIGenerate, onCreateNode, onClose]);
+  }, [query, isQuestion, nodes, onSelectNode, onOpenAIGenerate, onCreateNode, onExport, onOpenGraphChat, onClose]);
 
   const results = getResults();
 

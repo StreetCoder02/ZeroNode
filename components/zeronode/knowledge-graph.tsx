@@ -34,7 +34,7 @@ import SettingsModal from "./settings-modal";
 import EmptyState from "./empty-state";
 import CommandPalette from "./command-palette";
 import Navbar from "./navbar";
-import GraphChat from "./graph-chat";
+import AIDock from "./ai-dock";
 import NodeFilterBar from "./node-filter-bar";
 import type { NodeType } from "./knowledge-node";
 import { buildShareUrl, decodeGraph } from "@/lib/share";
@@ -69,6 +69,7 @@ function KnowledgeGraphInner() {
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [isAIGenerateModalOpen, setIsAIGenerateModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isAIDockOpen, setIsAIDockOpen] = useState(false);
   const [aiGenerateInitialPrompt, setAiGenerateInitialPrompt] = useState("");
   const [selectedNode, setSelectedNode] = useState<Node<KnowledgeNodeData> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -503,11 +504,32 @@ function KnowledgeGraphInner() {
         case "a": setActiveTool("add"); break;
         case "c": setActiveTool("connect"); break;
         case "d": setActiveTool("delete"); break;
+        case " ":
+          e.preventDefault();
+          if (nodes.length === 0) {
+            handleCreateBlankNode();
+          } else {
+            const newNode: Node<KnowledgeNodeData> = {
+              id: `node-${Date.now()}`,
+              type: "knowledge",
+              position: { 
+                x: 200 + Math.random() * 200, 
+                y: 200 + Math.random() * 200 
+              },
+              data: {
+                title: "New Node",
+                preview: "Click to edit...",
+                nodeType: "note",
+              },
+            };
+            setNodes((nds) => [...nds, newNode]);
+          }
+          break;
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [handleCreateBlankNode, nodes.length, setNodes]);
 
   // Parallax effect for background
   useEffect(() => {
@@ -676,17 +698,33 @@ function KnowledgeGraphInner() {
           nodes={nodes as Node<KnowledgeNodeData>[]}
           onSelectNode={(node) => {
             setSelectedNode(node);
-            setIsAIPanelOpen(false);
+            setIsCommandPaletteOpen(false);
+            fitView({
+              nodes: [{ id: node.id }],
+              duration: 600,
+              padding: 0.5,
+            });
           }}
           onOpenAIGenerate={handleOpenAIGenerateModal}
           onCreateNode={handleCreateBlankNode}
+          onExport={handleExport}
+          onOpenGraphChat={() => {
+            setIsCommandPaletteOpen(false);
+            setIsAIDockOpen(true);
+          }}
         />
         <NodeFilterBar
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
           nodeCounts={nodeCounts}
         />
-        <GraphChat nodes={nodes as Node<KnowledgeNodeData>[]} />
+        <AIDock
+          nodes={nodes as Node<KnowledgeNodeData>[]}
+          isOpen={isAIDockOpen}
+          onOpenChange={setIsAIDockOpen}
+          onOpenGenerate={handleOpenAIGenerateModal}
+          selectedNode={selectedNode}
+        />
         <SettingsModal 
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
