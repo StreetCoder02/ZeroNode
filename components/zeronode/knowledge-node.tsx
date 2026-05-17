@@ -11,6 +11,7 @@ import {
   FileText,
   Map,
   Brain,
+  GitBranch,
 } from "lucide-react";
 
 export type NodeType =
@@ -28,6 +29,7 @@ export type KnowledgeNodeData = Record<string, unknown> & {
   nodeType: NodeType;
   embedding?: number[];
   content?: string;
+  connectionCount?: number;
 };
 
 const nodeTypeConfig: Record<
@@ -47,7 +49,7 @@ const nodeTypeConfig: Record<
   research: { color: "#EC4899", icon: Sparkles, bgGlow: "rgba(236, 72, 153, 0.3)" },
 };
 
-function KnowledgeNode({ data }: NodeProps) {
+function KnowledgeNode({ data, selected }: NodeProps) {
   const nodeData = data as KnowledgeNodeData;
   const config = nodeTypeConfig[nodeData.nodeType];
   const Icon = config.icon;
@@ -75,8 +77,19 @@ function KnowledgeNode({ data }: NodeProps) {
         style={{
           background: "rgba(255, 255, 255, 0.05)",
           borderLeft: `3px solid ${config.color}`,
+          ...(selected ? {
+            boxShadow: "0 0 0 2px rgba(59,130,246,0.3), 0 0 20px rgba(59,130,246,0.15)",
+            borderColor: "rgba(59,130,246,0.6)"
+          } : {
+            boxShadow: `0 0 20px ${config.bgGlow}`
+          }),
         }}
       >
+        <div
+          className="absolute top-0 left-0 right-0 h-0.5 rounded-t-xl"
+          style={{ backgroundColor: config.color }}
+        />
+
         {/* Hover glow effect */}
         <div
           className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
@@ -103,6 +116,15 @@ function KnowledgeNode({ data }: NodeProps) {
           <p className="text-xs text-white/40 mt-1.5 line-clamp-1 group-hover:text-white/60 transition-colors">
             {nodeData.preview}
           </p>
+
+          {nodeData.connectionCount && nodeData.connectionCount > 0 ? (
+            <div className="flex items-center gap-1 mt-1.5">
+              <GitBranch className="w-2.5 h-2.5 text-white/20" />
+              <span className="text-[10px] text-white/25">
+                {nodeData.connectionCount} connection{nodeData.connectionCount > 1 ? "s" : ""}
+              </span>
+            </div>
+          ) : null}
 
           {/* Type indicator */}
           <div className="flex items-center gap-1 mt-2">

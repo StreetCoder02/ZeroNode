@@ -52,6 +52,14 @@ const initialNodes: Node<KnowledgeNodeData>[] = [];
 
 const initialEdges: Edge[] = [];
 
+function saveGraph(nodes: Node<KnowledgeNodeData>[], edges: Edge[]) {
+  try {
+    localStorage.setItem("zeronode-graph", JSON.stringify({ nodes, edges }));
+  } catch {
+    // Ignore storage failures so canvas interactions keep working.
+  }
+}
+
 function KnowledgeGraphInner() {
   const searchParams = useSearchParams();
   const { getNodes, fitView } = useReactFlow();
@@ -64,9 +72,11 @@ function KnowledgeGraphInner() {
   const [aiGenerateInitialPrompt, setAiGenerateInitialPrompt] = useState("");
   const [selectedNode, setSelectedNode] = useState<Node<KnowledgeNodeData> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [activeTool, setActiveTool] = useState<"select" | "pan" | "add" | "connect" | "delete">("select");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   const handleToolChange = useCallback(
     (tool: "select" | "pan" | "add" | "connect" | "delete") => {
@@ -86,6 +96,24 @@ function KnowledgeGraphInner() {
       window.history.replaceState({}, "", "/app");
     }
   }, [searchParams, setNodes, setEdges]);
+
+  useEffect(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    setIsSaved(false);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveGraph(nodes, edges);
+      setIsSaved(true);
+    }, 1500);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [nodes, edges]);
 
   const handleShare = useCallback(() => {
     if (nodes.length === 0) {
@@ -110,17 +138,6 @@ function KnowledgeGraphInner() {
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-
-  const filteredNodes = activeFilter === "all"
-    ? nodes
-    : nodes.map((n) => ({
-        ...n,
-        style: {
-          ...n.style,
-          opacity: n.data.nodeType === activeFilter ? 1 : 0.15,
-          transition: "opacity 0.3s ease",
-        },
-      }));
 
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -476,6 +493,22 @@ function KnowledgeGraphInner() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
+      if (e.target instanceof HTMLTextAreaElement) return;
+      switch (e.key.toLowerCase()) {
+        case "v": setActiveTool("select"); break;
+        case "h": setActiveTool("pan"); break;
+        case "a": setActiveTool("add"); break;
+        case "c": setActiveTool("connect"); break;
+        case "d": setActiveTool("delete"); break;
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
   // Parallax effect for background
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -491,15 +524,38 @@ function KnowledgeGraphInner() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
+  const nodesWithCounts = nodes.map((node) => ({
+    ...node,
+    data: {
+      ...node.data,
+      connectionCount: edges.filter(
+        (e) => e.source === node.id || e.target === node.id
+      ).length,
+    },
+  }));
+
+  const filteredNodes = activeFilter === "all"
+    ? nodesWithCounts
+    : nodesWithCounts.map((n) => ({
+        ...n,
+        style: {
+          ...n.style,
+          opacity: n.data.nodeType === activeFilter ? 1 : 0.15,
+          transition: "opacity 0.3s ease",
+        },
+      }));
+
   return (
     <div className="h-screen w-screen flex flex-col bg-black overflow-hidden">
       <Navbar 
-        onCreateBlankNode={handleCreateBlankNode} 
         onAIGenerateClick={handleOpenAIGenerateModal} 
         onClearGraph={handleClearGraph}
         onExport={handleExport}
         onShare={handleShare}
         onSettingsClick={() => setIsSettingsOpen(true)}
+        nodeCount={nodes.length}
+        edgeCount={edges.length}
+        isSaved={isSaved}
       />
 
       <div ref={containerRef} className="flex-1 relative">
@@ -514,70 +570,72 @@ function KnowledgeGraphInner() {
           }}
         />
 
-        <ReactFlow
-          nodes={filteredNodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onNodeDoubleClick={onNodeDoubleClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          proOptions={{ hideAttribution: true }}
-          className="!bg-transparent"
-          panOnDrag={activeTool === "pan" || activeTool === "select"}
-          selectionOnDrag={activeTool === "select"}
-          connectOnClick={activeTool === "connect"}
-          onPaneClick={(event) => {
-            if (activeTool === "add") {
-              const bounds = event.currentTarget.getBoundingClientRect();
-              const position = {
-                x: event.clientX - bounds.left,
-                y: event.clientY - bounds.top,
-              };
-              const newNode: Node<KnowledgeNodeData> = {
-                id: `node-${Date.now()}`,
-                type: "knowledge",
-                position,
-                data: {
-                  title: "New Node",
-                  preview: "Click to edit...",
-                  nodeType: "note",
-                },
-              };
-              setNodes((nds) => [...nds, newNode]);
-            }
-          }}
-          style={{
-            cursor: activeTool === "pan" ? "grab"
-              : activeTool === "add" ? "crosshair"
-              : activeTool === "delete" ? "not-allowed"
-              : activeTool === "connect" ? "crosshair"
-              : "default"
-          }}
-        >
-          <Background
-            variant={BackgroundVariant.Dots}
-            gap={24}
-            size={1}
-            color="rgba(255, 255, 255, 0.03)"
-          />
-          <MiniMap
-            nodeColor={() => "rgba(59, 130, 246, 0.8)"}
-            maskColor="rgba(59, 130, 246, 0.1)"
-            style={{
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              borderRadius: 8,
-              border: "1px solid rgba(255, 255, 255, 0.1)",
+        <div className="h-full" style={{ marginLeft: "56px" }}>
+          <ReactFlow
+            nodes={filteredNodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onNodeDoubleClick={onNodeDoubleClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            proOptions={{ hideAttribution: true }}
+            className="!bg-transparent"
+            panOnDrag={activeTool === "pan" || activeTool === "select"}
+            selectionOnDrag={activeTool === "select"}
+            connectOnClick={activeTool === "connect"}
+            onPaneClick={(event) => {
+              if (activeTool === "add") {
+                const bounds = event.currentTarget.getBoundingClientRect();
+                const position = {
+                  x: event.clientX - bounds.left,
+                  y: event.clientY - bounds.top,
+                };
+                const newNode: Node<KnowledgeNodeData> = {
+                  id: `node-${Date.now()}`,
+                  type: "knowledge",
+                  position,
+                  data: {
+                    title: "New Node",
+                    preview: "Click to edit...",
+                    nodeType: "note",
+                  },
+                };
+                setNodes((nds) => [...nds, newNode]);
+              }
             }}
-            pannable
-            zoomable
-          />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+            style={{
+              cursor: activeTool === "pan" ? "grab"
+                : activeTool === "add" ? "crosshair"
+                : activeTool === "delete" ? "not-allowed"
+                : activeTool === "connect" ? "crosshair"
+                : "default"
+            }}
+          >
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={24}
+              size={1}
+              color="rgba(255, 255, 255, 0.03)"
+            />
+            <MiniMap
+              nodeColor={() => "rgba(59, 130, 246, 0.8)"}
+              maskColor="rgba(59, 130, 246, 0.1)"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                borderRadius: 8,
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+              }}
+              pannable
+              zoomable
+            />
+            <Controls showInteractive={false} />
+          </ReactFlow>
+        </div>
 
         {/* Empty state overlay */}
         {nodes.length === 0 && (
@@ -591,6 +649,8 @@ function KnowledgeGraphInner() {
         <CanvasToolbar 
           activeTool={activeTool}
           onToolChange={handleToolChange}
+          nodeCount={nodes.length}
+          edgeCount={edges.length}
         />
         <AIPanel isOpen={isAIPanelOpen} onClose={() => setIsAIPanelOpen(false)} />
         <NodeEditorPanel
