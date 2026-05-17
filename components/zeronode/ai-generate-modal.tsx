@@ -152,26 +152,54 @@ export default function AIGenerateModal({
             const data = JSON.parse(line.slice(6));
 
             if (data.done && data.fullText) {
-              const cleaned = data.fullText
-                .replace(/```json/g, "")
-                .replace(/```/g, "")
-                .trim();
-              const nodes = JSON.parse(cleaned);
-              apiNodesRef.current = nodes;
-              
-              let i = 0;
-              const stagger = setInterval(() => {
-                if (i >= nodes.length) {
-                  clearInterval(stagger);
-                  setIsGenerating(false);
-                  return;
+              try {
+                const cleaned = data.fullText
+                  .replace(/```json/g, "")
+                  .replace(/```/g, "")
+                  .trim();
+
+                const parsed = JSON.parse(cleaned);
+
+                // Filter out any nodes with missing or empty title/description
+                const validNodes = parsed.filter(
+                  (n: { title?: string; description?: string; nodeType?: string }) =>
+                    n.title &&
+                    n.title.trim().length > 0 &&
+                    n.description &&
+                    n.description.trim().length > 0 &&
+                    n.nodeType
+                );
+
+                if (validNodes.length === 0) {
+                  throw new Error("No valid nodes parsed");
                 }
-                setGeneratedNodes((prev) => [
-                  ...prev,
-                  { ...nodes[i], id: `gen-${Date.now()}-${i}`, selected: true },
-                ]);
-                i++;
-              }, 150);
+
+                apiNodesRef.current = validNodes;
+
+                let i = 0;
+                const stagger = setInterval(() => {
+                  if (i >= validNodes.length) {
+                    clearInterval(stagger);
+                    setIsGenerating(false);
+                    return;
+                  }
+                  setGeneratedNodes((prev) => [
+                    ...prev,
+                    {
+                      ...validNodes[i],
+                      id: `gen-${Date.now()}-${i}`,
+                      selected: true
+                    },
+                  ]);
+                  i++;
+                }, 150);
+
+              } catch (err) {
+                console.error("Parse error:", err);
+                toast.error("Generation failed — response was malformed. Try again.");
+                setIsGenerating(false);
+                setHasGenerated(false);
+              }
             }
           } catch {
             // skip malformed
