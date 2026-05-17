@@ -6,6 +6,9 @@ import {
   ChevronDown, Circle, GitBranch, Save
 } from "lucide-react";
 import Link from "next/link";
+import type { Node, Edge } from "@xyflow/react";
+import { computeHealthScore } from "@/lib/graph-health";
+import type { KnowledgeNodeData } from "./knowledge-node";
 
 interface NavbarProps {
   onAIGenerateClick: () => void;
@@ -16,6 +19,8 @@ interface NavbarProps {
   nodeCount: number;
   edgeCount: number;
   isSaved: boolean;
+  nodes: Node<KnowledgeNodeData>[];
+  edges: Edge[];
 }
 
 export default function Navbar({
@@ -27,8 +32,19 @@ export default function Navbar({
   nodeCount,
   edgeCount,
   isSaved,
+  nodes,
+  edges,
 }: NavbarProps) {
   const [showSecondary, setShowSecondary] = useState(false);
+  const health = computeHealthScore(nodes, edges);
+
+  const gradeColor =
+    health.grade === "S" ? "#10B981"
+    : health.grade === "A" ? "#3B82F6"
+    : health.grade === "B" ? "#8B5CF6"
+    : health.grade === "C" ? "#F59E0B"
+    : health.grade === "D" ? "#F97316"
+    : "#EF4444";
 
   return (
     <header className="h-12 shrink-0 flex items-center justify-between
@@ -61,6 +77,63 @@ export default function Navbar({
             <Circle className="w-2 h-2 fill-violet-500 text-violet-500" />
             {edgeCount} edges
           </span>
+        </div>
+
+        <div className="w-px h-4 bg-white/10" />
+
+        <div className="relative group flex items-center gap-1.5
+          cursor-default">
+          <div
+            className="text-xs font-bold px-2 py-0.5 rounded-md
+              border transition-all"
+            style={{
+              color: gradeColor,
+              borderColor: `${gradeColor}40`,
+              backgroundColor: `${gradeColor}10`,
+            }}
+          >
+            {health.grade}
+          </div>
+          <span className="text-xs text-white/40">
+            {health.total}%
+          </span>
+
+          {/* Tooltip on hover */}
+          <div className="absolute top-full left-0 mt-2 w-56 p-3
+            bg-[#0a0a0a] border border-white/10 rounded-xl
+            shadow-2xl opacity-0 pointer-events-none
+            group-hover:opacity-100 transition-opacity z-50">
+            <p className="text-xs font-semibold text-white mb-2">
+              Graph Health
+            </p>
+            {[
+              { label: "Node count", value: health.breakdown.nodeCount, max: 25 },
+              { label: "Connectivity", value: health.breakdown.connectivity, max: 35 },
+              { label: "Content depth", value: health.breakdown.contentDepth, max: 25 },
+              { label: "Type diversity", value: health.breakdown.typeDiversity, max: 15 },
+            ].map(({ label, value, max }) => (
+              <div key={label} className="mb-1.5">
+                <div className="flex justify-between text-[10px]
+                  text-white/40 mb-0.5">
+                  <span>{label}</span>
+                  <span>{value}/{max}</span>
+                </div>
+                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${(value / max) * 100}%`,
+                      backgroundColor: gradeColor,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+            <p className="text-[10px] text-white/40 mt-2 border-t
+              border-white/8 pt-2">
+              {health.insight}
+            </p>
+          </div>
         </div>
 
         <div className="w-px h-4 bg-white/10" />

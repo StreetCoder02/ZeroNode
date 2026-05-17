@@ -36,8 +36,10 @@ import CommandPalette from "./command-palette";
 import Navbar from "./navbar";
 import AIDock from "./ai-dock";
 import NodeFilterBar from "./node-filter-bar";
+import ShortcutsModal from "./shortcuts-modal";
 import type { NodeType } from "./knowledge-node";
 import { buildShareUrl, decodeGraph } from "@/lib/share";
+import { useHistory } from "@/lib/use-history";
 import { useSearchParams } from "next/navigation";
 
 const nodeTypes = {
@@ -65,11 +67,17 @@ function KnowledgeGraphInner() {
   const { getNodes, fitView } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { pushSnapshot, undo, redo } = useHistory(
+    (n) => setNodes(n as Node<KnowledgeNodeData>[]),
+    setEdges
+  );
   const [activeFilter, setActiveFilter] = useState<NodeType | "all">("all");
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [isAIGenerateModalOpen, setIsAIGenerateModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isAIDockOpen, setIsAIDockOpen] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [aiGenerateInitialPrompt, setAiGenerateInitialPrompt] = useState("");
   const [selectedNode, setSelectedNode] = useState<Node<KnowledgeNodeData> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -130,9 +138,10 @@ function KnowledgeGraphInner() {
   }, [nodes, edges]);
 
   const handleClearGraph = useCallback(() => {
+    pushSnapshot(nodes, edges);
     setNodes([]);
     setEdges([]);
-  }, [setNodes, setEdges]);
+  }, [pushSnapshot, nodes, edges, setNodes, setEdges]);
 
   const nodeCounts = nodes.reduce((acc, node) => {
     const type = node.data.nodeType as string;
@@ -156,16 +165,20 @@ function KnowledgeGraphInner() {
   );
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params: Connection) => {
+      pushSnapshot(nodes, edges);
+      setEdges((eds) => addEdge(params, eds));
+    },
+    [pushSnapshot, nodes, edges, setEdges]
   );
 
   const handleDeleteNode = useCallback(
     (id: string) => {
+      pushSnapshot(nodes, edges);
       setNodes((nds) => nds.filter((node) => node.id !== id));
       setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
     },
-    [setNodes, setEdges]
+    [pushSnapshot, nodes, edges, setNodes, setEdges]
   );
 
   const onNodeClick = useCallback(
@@ -180,6 +193,12 @@ function KnowledgeGraphInner() {
     },
     [activeTool, handleDeleteNode]
   );
+
+  useEffect(() => {
+    if (!selectedNode) {
+      setIsFocusMode(false);
+    }
+  }, [selectedNode]);
 
   const handleUpdateNode = useCallback(
     (id: string, data: Partial<KnowledgeNodeData>) => {
@@ -214,6 +233,7 @@ function KnowledgeGraphInner() {
 
   const handleAddGeneratedNodes = useCallback(
     (newNodes: { id: string; title: string; description: string; nodeType: KnowledgeNodeData["nodeType"]; connections?: string[] }[]) => {
+      pushSnapshot(nodes, edges);
       const baseX = 100;
       const baseY = 100;
       const spacing = 180;
@@ -349,7 +369,7 @@ function KnowledgeGraphInner() {
         });
       }, 3000);
     },
-    [nodes, setNodes, setEdges]
+    [pushSnapshot, nodes, edges, setNodes, setEdges]
   );
 
   const handleFindRelated = useCallback(
@@ -484,6 +504,19 @@ function KnowledgeGraphInner() {
   // Global Cmd+K / Ctrl+K listener for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        e.preventDefault();
+        undo(nodes, edges);
+        toast.success("Undone");
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "y" ||
+        (e.shiftKey && e.key === "z"))) {
+        e.preventDefault();
+        redo(nodes, edges);
+        toast.success("Redone");
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
@@ -492,7 +525,7 @@ function KnowledgeGraphInner() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [undo, redo, nodes, edges]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -504,6 +537,20 @@ function KnowledgeGraphInner() {
         case "a": setActiveTool("add"); break;
         case "c": setActiveTool("connect"); break;
         case "d": setActiveTool("delete"); break;
+        case "?":
+          setIsShortcutsOpen((prev) => !prev);
+          break;
+        case "0":
+          fitView({ duration: 600, padding: 0.2 });
+          break;
+        case "f":
+          if (selectedNode) {
+            setIsFocusMode((prev) => !prev);
+          }
+          break;
+        case "escape":
+          setIsFocusMode(false);
+          break;
         case " ":
           e.preventDefault();
           if (nodes.length === 0) {
@@ -529,7 +576,7 @@ function KnowledgeGraphInner() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [handleCreateBlankNode, nodes.length, setNodes]);
+  }, [fitView, handleCreateBlankNode, nodes.length, selectedNode, setNodes]);
 
   // Parallax effect for background
   useEffect(() => {
@@ -556,16 +603,42 @@ function KnowledgeGraphInner() {
     },
   }));
 
-  const filteredNodes = activeFilter === "all"
-    ? nodesWithCounts
-    : nodesWithCounts.map((n) => ({
-        ...n,
-        style: {
-          ...n.style,
-          opacity: n.data.nodeType === activeFilter ? 1 : 0.15,
-          transition: "opacity 0.3s ease",
-        },
-      }));
+  const focusedNodeIds = isFocusMode && selectedNode
+    ? new Set([
+        selectedNode.id,
+        ...edges
+          .filter(
+            (e) =>
+              e.source === selectedNode.id ||
+              e.target === selectedNode.id
+          )
+          .flatMap((e) => [e.source, e.target]),
+      ])
+    : null;
+
+  const filteredNodes =
+    isFocusMode && focusedNodeIds
+      ? nodesWithCounts.map((n) => ({
+          ...n,
+          style: {
+            ...n.style,
+            opacity: focusedNodeIds.has(n.id) ? 1 : 0.05,
+            transition: "opacity 0.4s ease",
+            filter: focusedNodeIds.has(n.id)
+              ? "none"
+              : "blur(1px)",
+          },
+        }))
+      : activeFilter === "all"
+      ? nodesWithCounts
+      : nodesWithCounts.map((n) => ({
+          ...n,
+          style: {
+            ...n.style,
+            opacity: n.data.nodeType === activeFilter ? 1 : 0.15,
+            transition: "opacity 0.3s ease",
+          },
+        }));
 
   return (
     <div className="h-screen w-screen flex flex-col bg-black overflow-hidden">
@@ -578,6 +651,8 @@ function KnowledgeGraphInner() {
         nodeCount={nodes.length}
         edgeCount={edges.length}
         isSaved={isSaved}
+        nodes={nodes as Node<KnowledgeNodeData>[]}
+        edges={edges}
       />
 
       <div ref={containerRef} className="flex-1 relative">
@@ -591,6 +666,19 @@ function KnowledgeGraphInner() {
             transform: `translate(${mousePosition.x}px, ${mousePosition.y}px)`,
           }}
         />
+
+        {isFocusMode && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 
+            z-30 flex items-center gap-2 px-4 py-2 rounded-full
+            bg-black/80 backdrop-blur-xl border border-blue-500/30
+            shadow-lg shadow-blue-500/10 pointer-events-none">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 
+              animate-pulse" />
+            <span className="text-xs font-medium text-white/70">
+              Focus mode — press F or Esc to exit
+            </span>
+          </div>
+        )}
 
         <div className="h-full" style={{ marginLeft: "56px" }}>
           <ReactFlow
@@ -611,6 +699,7 @@ function KnowledgeGraphInner() {
             selectionOnDrag={activeTool === "select"}
             connectOnClick={activeTool === "connect"}
             onPaneClick={(event) => {
+              if (activeTool !== "add") setIsFocusMode(false);
               if (activeTool === "add") {
                 const bounds = event.currentTarget.getBoundingClientRect();
                 const position = {
@@ -627,6 +716,7 @@ function KnowledgeGraphInner() {
                     nodeType: "note",
                   },
                 };
+                pushSnapshot(nodes, edges);
                 setNodes((nds) => [...nds, newNode]);
               }
             }}
@@ -673,6 +763,7 @@ function KnowledgeGraphInner() {
           onToolChange={handleToolChange}
           nodeCount={nodes.length}
           edgeCount={edges.length}
+          isFocusMode={isFocusMode}
         />
         <AIPanel isOpen={isAIPanelOpen} onClose={() => setIsAIPanelOpen(false)} />
         <NodeEditorPanel
@@ -728,6 +819,10 @@ function KnowledgeGraphInner() {
         <SettingsModal 
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
+        />
+        <ShortcutsModal
+          isOpen={isShortcutsOpen}
+          onClose={() => setIsShortcutsOpen(false)}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "framer-motion";
 import {
@@ -53,6 +53,19 @@ function KnowledgeNode({ data, selected }: NodeProps) {
   const nodeData = data as KnowledgeNodeData;
   const config = nodeTypeConfig[nodeData.nodeType];
   const Icon = config.icon;
+  const [mounted, setMounted] = useState(false);
+  const [glowing, setGlowing] = useState(false);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setMounted(true), 10);
+    const t2 = setTimeout(() => setGlowing(true), 50);
+    const t3 = setTimeout(() => setGlowing(false), 600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
 
   return (
     <motion.div
@@ -77,12 +90,17 @@ function KnowledgeNode({ data, selected }: NodeProps) {
         style={{
           background: "rgba(255, 255, 255, 0.05)",
           borderLeft: `3px solid ${config.color}`,
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "scale(1)" : "scale(0.7)",
+          transition: "opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          boxShadow: glowing
+            ? `0 0 0 2px ${config.color}60, 0 0 30px ${config.color}40, 0 0 60px ${config.color}20`
+            : selected
+            ? "0 0 0 2px rgba(59,130,246,0.3), 0 0 20px rgba(59,130,246,0.15)"
+            : `0 0 20px ${config.bgGlow}`,
           ...(selected ? {
-            boxShadow: "0 0 0 2px rgba(59,130,246,0.3), 0 0 20px rgba(59,130,246,0.15)",
             borderColor: "rgba(59,130,246,0.6)"
-          } : {
-            boxShadow: `0 0 20px ${config.bgGlow}`
-          }),
+          } : {}),
         }}
       >
         <div

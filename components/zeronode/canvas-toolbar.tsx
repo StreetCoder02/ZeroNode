@@ -2,7 +2,7 @@
 
 import {
   MousePointer, Hand, PlusCircle, GitBranch,
-  Trash2, LayoutGrid, Circle, Layers
+  Trash2, LayoutGrid, Circle, Layers, Crosshair
 } from "lucide-react";
 
 type Tool = "select" | "pan" | "add" | "connect" | "delete";
@@ -12,6 +12,7 @@ interface CanvasToolbarProps {
   onToolChange: (tool: Tool) => void;
   nodeCount: number;
   edgeCount: number;
+  isFocusMode: boolean;
 }
 
 const tools: {
@@ -32,6 +33,7 @@ export default function CanvasToolbar({
   onToolChange,
   nodeCount,
   edgeCount,
+  isFocusMode,
 }: CanvasToolbarProps) {
   return (
     <div className="absolute left-0 top-0 bottom-0 w-14 z-10
@@ -107,6 +109,18 @@ export default function CanvasToolbar({
 
       {/* Bottom: layout hint */}
       <div className="mt-auto">
+        {isFocusMode && (
+          <div className="w-8 h-px bg-blue-500/50 mb-1" />
+        )}
+        {isFocusMode && (
+          <div className="flex flex-col items-center gap-0.5
+            w-full px-2 py-1.5 rounded-lg bg-blue-500/10
+            border border-blue-500/20">
+            <Crosshair className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-[8px] text-blue-400/70 uppercase
+              tracking-wide">Focus</span>
+          </div>
+        )}
         <button
           title="Auto layout (coming soon)"
           className="p-2 rounded-lg text-white/20
