@@ -266,10 +266,7 @@ export default function NodeEditorPanel({
                   <Network className="w-4 h-4 text-violet-400 shrink-0" />
                   {isFindingRelated ? "Finding related..." : "Find related nodes"}
                 </button>
-                <button className="flex items-center gap-2 px-3 py-2 text-sm text-white/70 bg-transparent border border-white/10 rounded-lg hover:bg-white/5 hover:text-white hover:border-white/20 transition-all">
-                  <GitBranch className="w-3.5 h-3.5 text-violet-400" />
-                  Expand into subtopics
-                </button>
+
               </div>
             </div>
 
@@ -310,10 +307,7 @@ export default function NodeEditorPanel({
                   <p className="text-xs text-white/30">No connections yet</p>
                 )}
               </div>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/50 bg-transparent border border-dashed border-white/20 rounded-lg hover:bg-white/5 hover:text-white/70 hover:border-white/30 transition-all w-fit">
-                <Plus className="w-3 h-3" />
-                Add connection
-              </button>
+
             </div>
 
             {/* Tags */}

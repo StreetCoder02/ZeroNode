@@ -11,6 +11,7 @@ interface GeneratedNode {
   title: string;
   description: string;
   nodeType: KnowledgeNodeData["nodeType"];
+  connections?: string[];
   selected: boolean;
 }
 

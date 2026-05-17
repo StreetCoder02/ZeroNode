@@ -22,14 +22,13 @@ export type NodeType =
   | "roadmap"
   | "research";
 
-export interface KnowledgeNodeData {
-  [key: string]: unknown;
+export type KnowledgeNodeData = Record<string, unknown> & {
   title: string;
   preview: string;
   nodeType: NodeType;
   embedding?: number[];
   content?: string;
-}
+};
 
 const nodeTypeConfig: Record<
   NodeType,

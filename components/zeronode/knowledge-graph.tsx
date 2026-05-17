@@ -195,7 +195,7 @@ function KnowledgeGraphInner() {
   }, []);
 
   const handleAddGeneratedNodes = useCallback(
-    (newNodes: { id: string; title: string; description: string; nodeType: KnowledgeNodeData["nodeType"] }[]) => {
+    (newNodes: { id: string; title: string; description: string; nodeType: KnowledgeNodeData["nodeType"]; connections?: string[] }[]) => {
       const baseX = 100;
       const baseY = 100;
       const spacing = 180;
@@ -215,7 +215,50 @@ function KnowledgeGraphInner() {
         },
       }));
 
+      const explicitEdges: Edge[] = [];
+      newNodes.forEach((node, index) => {
+        if (node.connections && node.connections.length > 0) {
+          const sourceNodeId = nodesToAdd[index].id;
+          node.connections.forEach(connTitle => {
+            const targetNodeIdx = newNodes.findIndex(n => n.title.toLowerCase() === connTitle.toLowerCase());
+            if (targetNodeIdx !== -1) {
+              const targetNodeId = nodesToAdd[targetNodeIdx].id;
+              if (targetNodeId !== sourceNodeId) {
+                explicitEdges.push({
+                  id: `explicit-${sourceNodeId}-${targetNodeId}`,
+                  source: sourceNodeId,
+                  target: targetNodeId,
+                  type: "animated",
+                  style: { stroke: "rgba(6, 182, 212, 0.4)", strokeWidth: 1.5 },
+                });
+              }
+            } else {
+              const existingNode = nodes.find(n => (n.data.title as string).toLowerCase() === connTitle.toLowerCase());
+              if (existingNode) {
+                explicitEdges.push({
+                  id: `explicit-${sourceNodeId}-${existingNode.id}`,
+                  source: sourceNodeId,
+                  target: existingNode.id,
+                  type: "animated",
+                  style: { stroke: "rgba(6, 182, 212, 0.4)", strokeWidth: 1.5 },
+                });
+              }
+            }
+          });
+        }
+      });
+
       setNodes((nds) => [...nds, ...nodesToAdd]);
+      if (explicitEdges.length > 0) {
+        setEdges((eds) => {
+          const existingIds = new Set(eds.map((e) => e.id));
+          const newEdges = explicitEdges.filter((e) => !existingIds.has(e.id));
+          return [...eds, ...newEdges];
+        });
+        setTimeout(() => {
+          toast.success(`Created ${explicitEdges.length} explicit connections`);
+        }, 500);
+      }
 
       nodesToAdd.forEach(async (node) => {
         const embedding = await embedText(
@@ -288,7 +331,7 @@ function KnowledgeGraphInner() {
         });
       }, 3000);
     },
-    [setNodes, setEdges]
+    [nodes, setNodes, setEdges]
   );
 
   const handleFindRelated = useCallback(
@@ -451,7 +494,7 @@ function KnowledgeGraphInner() {
   return (
     <div className="h-screen w-screen flex flex-col bg-black overflow-hidden">
       <Navbar 
-        onAIClick={handleOpenAIPanel} 
+        onCreateBlankNode={handleCreateBlankNode} 
         onAIGenerateClick={handleOpenAIGenerateModal} 
         onClearGraph={handleClearGraph}
         onExport={handleExport}

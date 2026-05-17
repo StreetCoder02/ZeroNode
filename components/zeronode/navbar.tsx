@@ -3,7 +3,7 @@
 import { Search, Sparkles, Plus, Settings, Download, Share2 } from "lucide-react";
 
 interface NavbarProps {
-  onAIClick: () => void;
+  onCreateBlankNode: () => void;
   onAIGenerateClick: () => void;
   onExport: () => void;
   onShare: () => void;
@@ -11,7 +11,7 @@ interface NavbarProps {
   onSettingsClick: () => void;
 }
 
-export default function Navbar({ onAIClick, onAIGenerateClick, onExport, onShare, onClearGraph, onSettingsClick }: NavbarProps) {
+export default function Navbar({ onCreateBlankNode, onAIGenerateClick, onExport, onShare, onClearGraph, onSettingsClick }: NavbarProps) {
   return (
     <nav className="h-12 flex items-center justify-between px-4 border-b border-white/10 bg-black/50 backdrop-blur-xl relative z-50">
       {/* Logo */}
@@ -73,6 +73,7 @@ export default function Navbar({ onAIClick, onAIGenerateClick, onExport, onShare
           <Sparkles className="w-4.5 h-4.5" />
         </button>
         <button
+          onClick={onCreateBlankNode}
           className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-primary/20 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all duration-300"
           title="New Node"
         >
